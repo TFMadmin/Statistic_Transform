@@ -94,6 +94,28 @@ def rolling_drawdown(y):
     cummax = y.cummax()
     drawdown  = cummax - y
     return max(drawdown)
+def backtest_equity():
+    with open("backtest_equity.pkl", "rb") as f:  # "rb" because we want to read in binary mode
+        equity = pickle.load(f)
+
+    equity["cummax"] = equity["equity"].cummax()
+    equity["drawdown"] = (equity["cummax"] - equity["equity"])/equity["cummax"]
+    equity["return"] = equity["equity"].pct_change()
+    equity["Sortino Monthly"] = equity["return"].rolling(21).apply(lambda x: monthly_sortino(x))
+    equity["Sortino 3 Month"] = equity["return"].rolling(63).apply(lambda x: month3_sortino(x))
+    equity["Sortino 6 Month"] = equity["return"].rolling(126).apply(lambda x: month6_sortino(x))
+    equity["Sortino Yearly"] = equity["return"].rolling(252).apply(lambda x: yearly_sortino(x))
+    equity["Sharpe Monthly"] = equity["return"].rolling(21).apply(lambda x: monthly_sharpe(x))
+    equity["Sharpe 3 Month"] = equity["return"].rolling(63).apply(lambda x: month3_sharpe(x))
+    equity["Sharpe 6 Month"] = equity["return"].rolling(126).apply(lambda x: month6_sharpe(x))
+    equity["Sharpe Yearly"] = equity["return"].rolling(252).apply(lambda x: yearly_sharpe(x))
+    equity["Monthly Return"] = equity["equity"].pct_change(21)
+    equity["Quarterly Return"] = equity["equity"].pct_change(63)
+    equity["Yearly Return"] = equity["equity"].pct_change(252)
+    equity["Monthly Drawdown"] = equity["drawdown"].rolling(21).apply(lambda x: rolling_drawdown(x))
+    equity["3 Month Drawdown"] = equity["drawdown"].rolling(63).apply(lambda x: rolling_drawdown(x))
+    equity["Yearly Drawdown"] = equity["drawdown"].rolling(252).apply(lambda x: rolling_drawdown(x))
+    equity.to_csv("BACKTEST_EQUITY_CSV.csv")
 
 def calculate_equity_curve_stats():
     with open("G:\My Drive\EQUITY_DATAFRAME.pkl", "rb") as f:  # "rb" because we want to read in binary mode
@@ -119,13 +141,14 @@ def calculate_equity_curve_stats():
     equity.to_csv("EQUITY_CSV.csv")
 
 def open_positions():
-    with open("G:\My Drive\open_positions.pkl", "rb") as f:  # "rb" because we want to read in binary mode
+    with open("open_positions.pkl", "rb") as f:  # "rb" because we want to read in binary mode
         pos = pickle.load(f)
     pos_data = pd.DataFrame(pos).T
+    pos_data.reset_index(inplace = True)
     pos_data.to_csv("pos_data.csv")
 
 def account_balance():
-    with open("G:\My Drive\account_balance.pkl", "rb") as f:  # "rb" because we want to read in binary mode
+    with open("account_balance.pkl", "rb") as f:  # "rb" because we want to read in binary mode
         bal = pickle.load(f)
 
     bal = bal["Balances"][0]
@@ -137,5 +160,26 @@ def account_balance():
     bal_data = pd.Series(bal.values(), index = bal.keys())
     bal_data.to_csv("bal_data.csv")
 
+def open_position_tracking():
+    with open("open_positions_full.pkl", "rb") as f:  # "rb" because we want to read in binary mode
+        open_positions = pickle.load(f)
+
+    with open("position_dictionary.pkl", "rb") as f:  # "rb" because we want to read in binary mode
+        pos_dict = pickle.load(f)
+
+    pos_ids = [p["PositionID"] for p in open_positions]
+
+    for id,pos in zip(pos_ids,open_positions):
+        if id in pos_dict.keys():
+            pos_dict[id].append(pos)
+        else:
+            pos_dict[id] = [pos]
+
+    with open("position_dictionary.pkl","wb") as f:  # "wb" because we want to write in binary mode
+        pickle.dump(pos_dict, f)
+
+
 if __name__ == '__main__':
     open_positions()
+    account_balance()
+    open_position_tracking()
